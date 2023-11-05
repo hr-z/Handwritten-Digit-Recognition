@@ -1,8 +1,8 @@
 // //import {useDraw} from "./Hook.js";
 import {  useEffect, useRef } from "react";
 import * as tf from '@tensorflow/tfjs';
-
-loadModel();
+import {createModel} from "./model.js"
+// loadModel();
 var isPainting = false;
 var previousPoint = {x : 0,y : 0};
 var model;
@@ -57,17 +57,27 @@ const Canvas = props => {
         const imageSrc = canvas.toDataURL('image/png');
         const img = new Image();
         img.src = imageSrc;
-
+        
+        var resizedCanvas = document.createElement("canvas");
+        var resizedImg = resizedCanvas.getContext("2d");
         img.onload = () => {
-            const trimmedImg = trimCanvas(canvas);
-            // const resizedDataURL = trimmedCanvas.toDataURL('image/png'); 
+            const trimmedCtx = trimCanvas(canvas);
+            const trimmedImg = new Image();
+            trimmedImg.src = trimmedCtx.canvas.toDataURL('image/png');
+            resizedCanvas.width = 28;
+            resizedCanvas.height = 28;
+            resizedImg.drawImage(trimmedImg,0,0,28,28);
+            // const resizedDataURL = resizedImg.canvas.toDataURL('image/png'); 
             // const resizedImg = new Image(); 
             // resizedImg.src = resizedDataURL;
-            predict(trimmedImg);
+
+            
+            predict(resizedImg);
             //testing
             // const a = document.createElement('a');
             // a.href = resizedDataURL; // Set the Data URL as the anchor's href
             // a.download = 'captured_image.png'; // Specify the default filename for the download
+            
             // a.click();
 
         }
@@ -85,20 +95,34 @@ const Canvas = props => {
             )
 }
 
-async function loadModel() {
-    model = await tf.loadLayersModel('E:/Handwrite Recognition/handwrite/src/model.json');
-    if (model) {
-      const result = model.predict(/* input data */);
-      console.log(result);
-    } else {
-      console.error('Model is undefined.');
-    }
-}
+// async function loadModel() {
+//     model = await tf.loadLayersModel('E:/Handwrite Recognition/handwrite/src/model.json');
+//     if (model) {
+//       const result = model.predict(/* input data */);
+//       console.log(result);
+//     } else {
+//       console.error('Model is undefined.');
+//     }
+// }
+
 function predict(img) {
-    var pixelData = img.getImageData(0,0,img.canvas.width,img.canvas.height);
-    const X = tf.tensor([pixelData]);
-    const result = model.predict(X);
-    console.log("The prediction result is:" + result);
+    let imageData = img.getImageData(0, 0, 28, 28);
+
+    let inputTensor = tf.browser.fromPixels(imageData);
+
+    inputTensor = tf.image.resizeBilinear(inputTensor, [28, 28]);
+
+    inputTensor = inputTensor.div(tf.scalar(255));
+
+    inputTensor = inputTensor.reshape([1, -1]);
+    console.log(inputTensor);
+    let prediction;
+    (model = createModel()).then(()=>{prediction = model.predict(inputTensor);});
+
+    //const prediction = model.predict(inputTensor);
+
+    // const result = model.predict(X);
+    console.log("The prediction result is:" + prediction);
 }
 function trimCanvas(c) {
     var ctx = c.getContext('2d'),
